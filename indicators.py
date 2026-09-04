@@ -31,8 +31,15 @@ def compute_metrics(df: pd.DataFrame) -> dict:
     """Today's snapshot of every metric the filter chain needs."""
     close = df["Close"]
     high20 = close.rolling(20).max().iloc[-1]
+    price = float(close.iloc[-1])
+    prev_close = float(close.iloc[-2])
     return {
-        "price": float(close.iloc[-1]),
+        "price": price,
+        "prev_close": prev_close,
+        "change": price - prev_close,
+        "change_pct": (price / prev_close - 1) * 100 if prev_close else 0.0,
+        "day_high": float(df["High"].iloc[-1]),
+        "day_low": float(df["Low"].iloc[-1]),
         "ma20": float(close.rolling(20).mean().iloc[-1]),
         "ma50": float(close.rolling(50).mean().iloc[-1]),
         "atr_pct": atr_pct(df),

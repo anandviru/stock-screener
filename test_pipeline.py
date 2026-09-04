@@ -89,7 +89,7 @@ def run():
         "NOVOLM": make_stock(drift=0.004, vol=0.016, vol_surge=0.9,
                              base_volume=5_000_000, seed=14),
     }
-    results, reasons, funnel = run_screen(histories, spy_bull, make_vix(18))
+    results, reasons, funnel, scanned = run_screen(histories, spy_bull, make_vix(18))
     kept = {r["ticker"] for r in (results or [])}
     print(f"  funnel: {funnel}, kept: {kept or '{}'}")
     check("trending stock with surge is kept", "GOODMO" in kept)

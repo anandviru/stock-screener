@@ -46,10 +46,17 @@ def run_pipeline(progress=lambda msg: None) -> dict:
 
     if C.MIN_MARKET_CAP > 0:
         progress(f"Checking market caps (mega-cap only, >= ${C.MIN_MARKET_CAP/1e9:g}B)...")
-    results, reasons, funnel = run_screen(
+    results, reasons, funnel, scanned = run_screen(
         histories, spy, vix,
         market_cap_fetcher=fetch_market_cap if C.MIN_MARKET_CAP > 0 else None,
     )
+
+    scanned_df = None
+    if scanned:
+        scanned_df = pd.DataFrame(scanned)[
+            ["ticker", "price", "prev_close", "change", "change_pct",
+             "day_low", "day_high"]
+        ].round(2)
 
     out = {
         "date": today,
@@ -58,6 +65,7 @@ def run_pipeline(progress=lambda msg: None) -> dict:
         "regime_ok": results is not None,
         "regime_reasons": reasons,
         "funnel": funnel,
+        "scanned_df": scanned_df,
         "skipped_earnings": [],
         "results_df": None,
         "watchlist_path": None,
@@ -121,6 +129,9 @@ def main() -> None:
 
     if result["results_df"] is None:
         print("No stocks passed all filters today. Also a valid outcome.")
+        if result["scanned_df"] is not None:
+            print(f"\nMega-cap stocks scanned ({len(result['scanned_df'])}):")
+            print(result["scanned_df"].to_string(index=False))
         return
 
     df = result["results_df"]

@@ -145,6 +145,36 @@ if result is not None:
             st.markdown("### No stocks passed all filters today")
             st.markdown("Also a valid outcome — no forced trades on a quiet tape.")
             st.markdown('</div>', unsafe_allow_html=True)
+
+            scanned_df = result.get("scanned_df")
+            if scanned_df is not None and not scanned_df.empty:
+                st.subheader(f"Mega-cap stocks scanned ({len(scanned_df)})")
+                display_df = scanned_df.rename(columns={
+                    "ticker": "Ticker",
+                    "price": "Current Price",
+                    "prev_close": "Yesterday's Close",
+                    "change": "Change ($)",
+                    "change_pct": "Change (%)",
+                    "day_low": "Today's Low",
+                    "day_high": "Today's High",
+                })
+
+                def _color_change(v):
+                    if v > 0:
+                        return "color: #1a7f37"
+                    if v < 0:
+                        return "color: #cf222e"
+                    return ""
+
+                st.dataframe(
+                    display_df.style.format({
+                        "Current Price": "${:.2f}", "Yesterday's Close": "${:.2f}",
+                        "Change ($)": "{:+.2f}", "Change (%)": "{:+.2f}%",
+                        "Today's Low": "${:.2f}", "Today's High": "${:.2f}",
+                    }).map(_color_change, subset=["Change ($)", "Change (%)"]),
+                    use_container_width=True,
+                    hide_index=True,
+                )
         else:
             df = result["results_df"]
             st.dataframe(
