@@ -1,0 +1,8 @@
+name = "dailyonepercent-proxy"
+main = "worker.js"
+compatibility_date = "2024-09-04"
+
+routes = [
+  { pattern = "dailyonepercent.info/*", zone_name = "dailyonepercent.info" },
+  { pattern = "dailyonepercent.info", zone_name = "dailyonepercent.info" }
+]
