@@ -57,18 +57,41 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("📈 Daily 1% Screener")
+if "result" not in st.session_state:
+    st.session_state.result = None
+if "backtest_trades" not in st.session_state:
+    st.session_state.backtest_trades = None
+if "view" not in st.session_state:
+    st.session_state.view = "screener"
+
+
+def _run_screener_now():
+    st.session_state.view = "screener"
+    progress_area = st.empty()
+    with st.spinner("Running..."):
+        def show(msg):
+            progress_area.info(msg)
+        st.session_state.result = run_pipeline(progress=show)
+    progress_area.empty()
+
+
+# ---------- header ----------
+col_title, col_run, col_nav = st.columns([5, 2, 1.3], vertical_alignment="center")
+with col_title:
+    st.markdown("## 📈 Daily 1% Screener")
+with col_run:
+    if st.button("🔄 Refresh Screener", type="primary", use_container_width=True):
+        _run_screener_now()
+with col_nav:
+    if st.button("🧪 Backtest", type="secondary", use_container_width=True):
+        st.session_state.view = "backtest"
+
 st.caption(
     "Flags up to 10 liquid stocks whose structure makes a +1% move plausible "
     "for the next session, each with a pre-computed target and stop. "
     "It flags candidates and enforces a written trade plan — it doesn't "
     "guarantee profits, place trades, or replace judgment."
 )
-
-if "result" not in st.session_state:
-    st.session_state.result = None
-if "backtest_trades" not in st.session_state:
-    st.session_state.backtest_trades = None
 
 # ---------- sidebar (thresholds + history) ----------
 with st.sidebar:
@@ -100,20 +123,8 @@ with st.sidebar:
         chosen = "(none)"
         st.caption("No saved watchlists yet.")
 
-tab_screen, tab_backtest = st.tabs(["📊 Screener", "🧪 Backtest"])
-
-# ================= Screener tab =================
-with tab_screen:
-    run_clicked = st.button("▶ Run screener now", type="primary", use_container_width=True)
-
-    if run_clicked:
-        progress_area = st.empty()
-        with st.spinner("Running..."):
-            def show(msg):
-                progress_area.info(msg)
-            st.session_state.result = run_pipeline(progress=show)
-        progress_area.empty()
-
+# ================= Screener view =================
+if st.session_state.view == "screener":
     result = st.session_state.result
 
     if result is not None:
@@ -164,9 +175,9 @@ with tab_screen:
 
                     def _color_change(v):
                         if v > 0:
-                            return "color: #1a7f37"
+                            return "color: #16A34A"
                         if v < 0:
-                            return "color: #cf222e"
+                            return "color: #DC2626"
                         return ""
 
                     st.dataframe(
@@ -201,7 +212,7 @@ with tab_screen:
                     "time-stop at end of day if neither hits."
                 )
     else:
-        st.info("Click **Run screener now** above to fetch today's data and screen the universe.")
+        st.info("Click **Refresh Screener** above to fetch today's data and screen the universe.")
 
     # ---------- history viewer ----------
     if chosen != "(none)" and os.path.exists(chosen):
@@ -213,8 +224,8 @@ with tab_screen:
         else:
             st.dataframe(hist_df, use_container_width=True, hide_index=True)
 
-# ================= Backtest tab =================
-with tab_backtest:
+# ================= Backtest view =================
+else:
     st.caption(
         "Walk-forward test: re-runs the exact same filter chain on each historical "
         "trading day using only data available up to that day, then checks whether "
