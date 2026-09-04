@@ -4,6 +4,8 @@ Filters run cheapest-first. The regime check can veto the entire day:
 a "no-trade day" is valid, important output, not a failure.
 """
 
+from typing import Callable, Optional
+
 import pandas as pd
 
 import config as C
@@ -34,6 +36,11 @@ def passes_universe(m: dict) -> bool:
     )
 
 
+def passes_mega_cap(market_cap: float | None) -> bool:
+    """Is this stock large enough to count as mega-cap?"""
+    return market_cap is not None and market_cap >= C.MIN_MARKET_CAP
+
+
 def passes_setup(m: dict, spy_ret20: float) -> bool:
     """Is the move likely soon? Momentum by default, mean-reversion optional."""
     if C.USE_MEAN_REVERSION:
@@ -60,14 +67,21 @@ def run_screen(
     histories: dict[str, pd.DataFrame],
     spy: pd.DataFrame,
     vix: pd.DataFrame,
+    market_cap_fetcher: Optional[Callable[[str], Optional[float]]] = None,
 ) -> tuple[list[dict] | None, list[str], dict[str, int]]:
     """
     Apply the full chain. Returns (results, reasons, funnel):
       results: top-N metric dicts, or None on a no-trade day
       reasons: why the day was vetoed (empty otherwise)
       funnel:  how many tickers survived each stage (for tuning)
+
+    market_cap_fetcher: optional ticker -> market_cap lookup, called only on
+      tickers that already passed the cheap universe filters. Left as None
+      (mega-cap filter skipped) by default so this stays network-free —
+      test_pipeline.py relies on that. run_daily.py wires in the real
+      fetch_market_cap from data.py when C.MIN_MARKET_CAP > 0.
     """
-    funnel = {"input": len(histories), "universe": 0, "setup": 0}
+    funnel = {"input": len(histories), "universe": 0, "mega_cap": 0, "setup": 0}
 
     regime_ok, reasons = check_regime(spy, vix)
     if not regime_ok:
@@ -81,6 +95,13 @@ def run_screen(
         if not passes_universe(m):
             continue
         funnel["universe"] += 1
+
+        if market_cap_fetcher is not None:
+            m["market_cap"] = market_cap_fetcher(ticker)
+            if not passes_mega_cap(m["market_cap"]):
+                continue
+        funnel["mega_cap"] += 1
+
         if not passes_setup(m, spy_ret20):
             continue
         funnel["setup"] += 1

@@ -9,6 +9,9 @@ MIN_AVG_DOLLAR_VOLUME = 30_000_000    # 20-day average daily dollar volume
 MIN_ATR_PCT = 2.0                     # ATR(14) as % of price; stock must "breathe" 2x target
 MAX_ATR_PCT = 8.0                     # too volatile = stops get blown through
 
+# --- Mega-cap filter (optional; can this stock even be considered mega-cap?) ---
+MIN_MARKET_CAP = 200_000_000_000      # $200B; the common "mega-cap" cutoff. Set to 0 to disable.
+
 # --- Setup filters, momentum flavor (is the move likely soon?) ---
 MIN_VOLUME_RATIO = 1.3                # today's volume / 20-day average volume
 MAX_DIST_FROM_HIGH20 = 2.0            # % below the 20-day high (breakout proximity)

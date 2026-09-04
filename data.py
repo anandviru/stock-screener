@@ -63,6 +63,19 @@ def fetch_market_context(days: int = 120) -> tuple[pd.DataFrame, pd.DataFrame]:
     return spy, vix
 
 
+def fetch_market_cap(ticker: str) -> float | None:
+    """
+    Return market cap in dollars, or None if unavailable.
+    One HTTP call per ticker — only call this on tickers that already
+    passed the cheaper price/volume/ATR filters, to limit request volume.
+    """
+    try:
+        cap = yf.Ticker(ticker).fast_info["market_cap"]
+        return float(cap) if cap else None
+    except Exception:
+        return None
+
+
 def fetch_next_earnings_date(ticker: str):
     """
     Return the next earnings date for a ticker, or None if unavailable.

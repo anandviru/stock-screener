@@ -74,11 +74,15 @@ with st.sidebar:
     st.divider()
     st.header("Current thresholds")
     st.caption("Edit `config.py` to change these, then re-run.")
+    market_cap_line = (
+        f"- **Market cap** ≥ ${C.MIN_MARKET_CAP/1e9:g}B (mega-cap only)\n"
+        if C.MIN_MARKET_CAP > 0 else ""
+    )
     st.markdown(f"""
 - **Price** ≥ ${C.MIN_PRICE:g}
 - **Avg $ volume** ≥ ${C.MIN_AVG_DOLLAR_VOLUME/1e6:g}M
 - **ATR%** {C.MIN_ATR_PCT:g}–{C.MAX_ATR_PCT:g}%
-- **Volume ratio** ≥ {C.MIN_VOLUME_RATIO:g}x
+{market_cap_line}- **Volume ratio** ≥ {C.MIN_VOLUME_RATIO:g}x
 - **Dist from 20d high** ≤ {C.MAX_DIST_FROM_HIGH20:g}%
 - **Style** {'Mean-reversion' if C.USE_MEAN_REVERSION else 'Momentum'}
 - **Regime** SPY > MA20{', ' if C.SPY_MUST_BE_ABOVE_MA20 else ' (off), '}VIX {C.VIX_MIN:g}–{C.VIX_MAX:g}
@@ -123,11 +127,15 @@ if result is not None:
     else:
         f = result["funnel"]
         n_kept = 0 if result["results_df"] is None else len(result["results_df"])
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Universe scanned", f["input"])
-        c2.metric("Passed universe filter", f["universe"])
-        c3.metric("Passed setup filter", f["setup"])
-        c4.metric("Kept on watchlist", n_kept)
+        cols = st.columns(5 if C.MIN_MARKET_CAP > 0 else 4)
+        cols[0].metric("Universe scanned", f["input"])
+        cols[1].metric("Passed universe filter", f["universe"])
+        i = 2
+        if C.MIN_MARKET_CAP > 0:
+            cols[i].metric(f"Mega-cap (≥${C.MIN_MARKET_CAP/1e9:g}B)", f["mega_cap"])
+            i += 1
+        cols[i].metric("Passed setup filter", f["setup"])
+        cols[i + 1].metric("Kept on watchlist", n_kept)
 
         for ticker, edate in result["skipped_earnings"]:
             st.caption(f"⏭️ Skipped {ticker} — earnings on {edate}")

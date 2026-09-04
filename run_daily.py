@@ -15,6 +15,7 @@ import pandas as pd
 import config as C
 from data import (
     fetch_history,
+    fetch_market_cap,
     fetch_market_context,
     fetch_next_earnings_date,
     load_universe,
@@ -43,7 +44,12 @@ def run_pipeline(progress=lambda msg: None) -> dict:
     progress("Fetching SPY and VIX for the regime check...")
     spy, vix = fetch_market_context(C.LOOKBACK_DAYS)
 
-    results, reasons, funnel = run_screen(histories, spy, vix)
+    if C.MIN_MARKET_CAP > 0:
+        progress(f"Checking market caps (mega-cap only, >= ${C.MIN_MARKET_CAP/1e9:g}B)...")
+    results, reasons, funnel = run_screen(
+        histories, spy, vix,
+        market_cap_fetcher=fetch_market_cap if C.MIN_MARKET_CAP > 0 else None,
+    )
 
     out = {
         "date": today,
@@ -109,6 +115,7 @@ def main() -> None:
         print(f"  (skipping {ticker}: earnings on {edate})")
     print(f"\nFilter funnel: {f['input']} in -> "
           f"{f['universe']} passed universe -> "
+          f"{f['mega_cap']} passed mega-cap -> "
           f"{f['setup']} passed setup -> "
           f"top {0 if result['results_df'] is None else len(result['results_df'])} kept\n")
 
