@@ -22,7 +22,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 import pandas as pd
 import streamlit as st
 
-import auth
+import accounts
 import config as C
 from backtest import run_backtest, summarize
 from run_daily import run_pipeline
@@ -138,14 +138,14 @@ def _auth_dialog():
             if password != password2:
                 st.error("Passwords don't match.")
             else:
-                ok, msg = auth.sign_up(email, password)
+                ok, msg = accounts.sign_up(email, password)
                 if ok:
                     st.session_state.user = email.strip().lower()
                     st.rerun()
                 else:
                     st.error(msg)
         else:
-            ok, msg = auth.log_in(email, password)
+            ok, msg = accounts.log_in(email, password)
             if ok:
                 st.session_state.user = email.strip().lower()
                 st.rerun()

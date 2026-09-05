@@ -1,5 +1,11 @@
 """
-auth.py — minimal email/password accounts, backed by Postgres (Supabase).
+accounts.py — minimal email/password accounts, backed by Postgres (Supabase).
+
+Named accounts.py rather than auth.py: Streamlit Community Cloud's own
+hosting layer appears to reserve/inject something at the top-level module
+name "auth" (observed as a `KeyError: 'auth'` crash reachable only via the
+anonymous/public viewer path, not when signed in as the app owner) --
+colliding with a user module of that name.
 
 Passwords are never stored in plain text — only a salted PBKDF2-SHA256
 hash, using the stdlib (no extra dependency for the hashing itself).
