@@ -113,6 +113,14 @@ def run_backtest(years: float = 2.0, progress=lambda msg: None) -> pd.DataFrame:
                 "exit": round(exit_price, 2),
                 "outcome": outcome,
                 "return_pct": round((exit_price / entry - 1) * 100, 3),
+                # Signal-time metrics, kept for diagnosing what actually
+                # predicts a winning trade vs. a stopped-out one.
+                "atr_pct": round(r["atr_pct"], 2),
+                "volume_ratio": round(r["volume_ratio"], 2),
+                "dist_high20": round(r["dist_high20"], 2),
+                "rsi": round(r["rsi"], 1),
+                "ret20": round(r["ret20"], 2),
+                "dollar_volume": round(r["dollar_volume"], 0),
             })
 
     progress("Backtest complete.")

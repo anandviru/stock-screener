@@ -63,7 +63,7 @@ def run():
     check("downtrending SPY vetoes the day", not ok and len(reasons) > 0)
 
     print("\n3. Regime veto — VIX too high:")
-    spy_bull = make_stock(drift=0.003, vol=0.010, seed=3)
+    spy_bull = make_stock(drift=0.001, vol=0.010, seed=3)
     ok, reasons = check_regime(spy_bull, make_vix(35))
     check("VIX 35 vetoes the day", not ok)
 
@@ -73,8 +73,8 @@ def run():
 
     print("\n5. Full screen keeps the right stocks:")
     histories = {
-        # Should PASS: uptrend, decent vol, volume surge, near highs
-        "GOODMO": make_stock(drift=0.004, vol=0.016, vol_surge=1.8,
+        # Should PASS: uptrend, decent vol, volume surge, near highs, healthy RSI
+        "GOODMO": make_stock(drift=0.0011, vol=0.016, vol_surge=1.8,
                              base_volume=5_000_000, seed=10),
         # Should FAIL setup: downtrend
         "DOWNTR": make_stock(drift=-0.004, vol=0.016, vol_surge=1.8,
@@ -88,6 +88,10 @@ def run():
         # Should FAIL setup: no volume surge
         "NOVOLM": make_stock(drift=0.004, vol=0.016, vol_surge=0.9,
                              base_volume=5_000_000, seed=14),
+        # Should FAIL setup: overbought (RSI too high) despite an otherwise
+        # textbook breakout -- the pattern the 2yr backtest showed losing money
+        "OVERBOT": make_stock(drift=0.004, vol=0.016, vol_surge=1.8,
+                              base_volume=5_000_000, seed=10),
     }
     results, reasons, funnel, stages = run_screen(histories, spy_bull, make_vix(18))
     kept = {r["ticker"] for r in (results or [])}
@@ -97,6 +101,7 @@ def run():
     check("low-ATR stock rejected", "SLEEPY" not in kept)
     check("illiquid stock rejected", "ILLIQD" not in kept)
     check("no-volume-surge stock rejected", "NOVOLM" not in kept)
+    check("overbought stock rejected", "OVERBOT" not in kept)
     check("results are scored and sorted",
           all(results[i]["score"] >= results[i + 1]["score"]
               for i in range(len(results) - 1)) if results else True)

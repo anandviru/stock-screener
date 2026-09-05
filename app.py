@@ -202,6 +202,7 @@ with st.sidebar:
 - **ATR%** {C.MIN_ATR_PCT:g}–{C.MAX_ATR_PCT:g}%
 {market_cap_line}- **Volume ratio** ≥ {C.MIN_VOLUME_RATIO:g}x
 - **Dist from 20d high** ≤ {C.MAX_DIST_FROM_HIGH20:g}%
+- **Max RSI** ≤ {C.MAX_RSI:g} (avoids chasing overbought breakouts)
 - **Style** {'Mean-reversion' if C.USE_MEAN_REVERSION else 'Momentum'}
 - **Regime** SPY > MA20{', ' if C.SPY_MUST_BE_ABOVE_MA20 else ' (off), '}VIX {C.VIX_MIN:g}–{C.VIX_MAX:g}
 - **Target / Stop** +{C.TARGET_PCT:g}% / -{C.STOP_PCT:g}%

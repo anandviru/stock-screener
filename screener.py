@@ -51,6 +51,7 @@ def passes_setup(m: dict, spy_ret20: float) -> bool:
         and m["volume_ratio"] >= C.MIN_VOLUME_RATIO
         and m["dist_high20"] <= C.MAX_DIST_FROM_HIGH20
         and (m["ret20"] - spy_ret20) >= C.MIN_RELATIVE_STRENGTH
+        and m["rsi"] <= C.MAX_RSI
     )
 
 
