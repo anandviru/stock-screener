@@ -1,4 +1,6 @@
 # Daily 1% Screener
+<!-- repo made private; verifying Streamlit Cloud auto-deploy still works -->
+
 
 A stock screener that runs after market close and flags up to 10 liquid stocks
 whose structure makes a +1% move plausible for the next session. Each pick comes
