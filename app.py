@@ -152,7 +152,7 @@ def _auth_dialog():
                 st.error(msg)
 
     st.caption(
-        "Demo accounts only — stored locally and may reset when the app restarts."
+        "Your account is stored in a real database and will persist across visits."
     )
 
 
