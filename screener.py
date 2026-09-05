@@ -68,15 +68,17 @@ def run_screen(
     spy: pd.DataFrame,
     vix: pd.DataFrame,
     market_cap_fetcher: Optional[Callable[[str], Optional[float]]] = None,
-) -> tuple[list[dict] | None, list[str], dict[str, int], list[dict]]:
+) -> tuple[list[dict] | None, list[str], dict[str, int], dict[str, list[dict]]]:
     """
-    Apply the full chain. Returns (results, reasons, funnel, scanned):
+    Apply the full chain. Returns (results, reasons, funnel, stages):
       results: top-N metric dicts, or None on a no-trade day
       reasons: why the day was vetoed (empty otherwise)
       funnel:  how many tickers survived each stage (for tuning)
-      scanned: metric dicts for every ticker that passed the mega-cap stage
-        (all universe-passers if the mega-cap filter is off) — lets callers
-        show the full scanned list even on a day nothing makes the watchlist
+      stages:  metric dicts for every ticker at each stage boundary, keyed
+        "all" (every ticker with clean data), "universe" (passed the cheap
+        universe filter), "mega_cap" (passed the mega-cap filter too, or
+        identical to "universe" when that filter is off) — lets callers
+        show the full list at any stage, not just the final watchlist.
 
     market_cap_fetcher: optional ticker -> market_cap lookup, called only on
       tickers that already passed the cheap universe filters. Left as None
@@ -85,30 +87,34 @@ def run_screen(
       fetch_market_cap from data.py when C.MIN_MARKET_CAP > 0.
     """
     funnel = {"input": len(histories), "universe": 0, "mega_cap": 0, "setup": 0}
-    scanned = []
+    stages: dict[str, list[dict]] = {"all": [], "universe": [], "mega_cap": []}
 
     regime_ok, reasons = check_regime(spy, vix)
     if not regime_ok:
-        return None, reasons, funnel, scanned
+        return None, reasons, funnel, stages
 
     spy_ret20 = float((spy["Close"].iloc[-1] / spy["Close"].iloc[-21] - 1) * 100)
 
     survivors = []
     for ticker, df in histories.items():
         m = compute_metrics(df)
+        entry = dict(m)
+        entry["ticker"] = ticker
+        stages["all"].append(entry)
+
         if not passes_universe(m):
             continue
         funnel["universe"] += 1
+        stages["universe"].append(dict(entry))
 
         if market_cap_fetcher is not None:
             m["market_cap"] = market_cap_fetcher(ticker)
             if not passes_mega_cap(m["market_cap"]):
                 continue
         funnel["mega_cap"] += 1
-
-        scanned_entry = dict(m)
-        scanned_entry["ticker"] = ticker
-        scanned.append(scanned_entry)
+        mega_entry = dict(m)
+        mega_entry["ticker"] = ticker
+        stages["mega_cap"].append(mega_entry)
 
         if not passes_setup(m, spy_ret20):
             continue
@@ -118,5 +124,6 @@ def run_screen(
         survivors.append(m)
 
     survivors.sort(key=lambda r: r["score"], reverse=True)
-    scanned.sort(key=lambda r: r["ticker"])
-    return survivors[: C.TOP_N], [], funnel, scanned
+    for rows in stages.values():
+        rows.sort(key=lambda r: r["ticker"])
+    return survivors[: C.TOP_N], [], funnel, stages

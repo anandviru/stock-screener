@@ -122,6 +122,7 @@ def _run_screener_now():
             progress_area.info(msg)
         st.session_state.result = run_pipeline(progress=show)
     progress_area.empty()
+    st.session_state.pop("selected_stage", None)
 
 
 @st.dialog("Sign in")
@@ -236,29 +237,87 @@ if st.session_state.view == "screener":
         else:
             f = result["funnel"]
             n_kept = 0 if result["results_df"] is None else len(result["results_df"])
-            cols = st.columns(5 if C.MIN_MARKET_CAP > 0 else 4)
-            cols[0].metric("Universe scanned", f["input"])
-            cols[1].metric("Passed universe filter", f["universe"])
+
+            if "selected_stage" not in st.session_state:
+                st.session_state.selected_stage = (
+                    "kept" if n_kept > 0
+                    else ("mega_cap" if C.MIN_MARKET_CAP > 0 else "universe")
+                )
+
+            def _stage_card(col, label, count, stage_key):
+                with col:
+                    active = st.session_state.selected_stage == stage_key
+                    if st.button(
+                        f"{count}\n{label}", key=f"card_{stage_key}",
+                        type="primary" if active else "secondary",
+                        use_container_width=True,
+                    ):
+                        st.session_state.selected_stage = stage_key
+
+            show_mega = C.MIN_MARKET_CAP > 0
+            cols = st.columns(4 if show_mega else 3)
+            _stage_card(cols[0], "Universe Scanned", f["input"], "all")
+            _stage_card(cols[1], "Passed Universe Filter", f["universe"], "universe")
             i = 2
-            if C.MIN_MARKET_CAP > 0:
-                cols[i].metric(f"Mega-cap (≥${C.MIN_MARKET_CAP/1e9:g}B)", f["mega_cap"])
+            if show_mega:
+                _stage_card(cols[i], f"Mega-Cap (≥${C.MIN_MARKET_CAP/1e9:g}B)", f["mega_cap"], "mega_cap")
                 i += 1
-            cols[i].metric("Passed setup filter", f["setup"])
-            cols[i + 1].metric("Kept on watchlist", n_kept)
+            _stage_card(cols[i], "Kept on Watchlist", n_kept, "kept")
 
             for ticker, edate in result["skipped_earnings"]:
                 st.caption(f"⏭️ Skipped {ticker} — earnings on {edate}")
 
-            if result["results_df"] is None:
-                st.markdown('<div class="empty-box">', unsafe_allow_html=True)
-                st.markdown("### No stocks passed all filters today")
-                st.markdown("Also a valid outcome — no forced trades on a quiet tape.")
-                st.markdown('</div>', unsafe_allow_html=True)
+            stage_labels = {
+                "all": "Universe Scanned",
+                "universe": "Passed Universe Filter",
+                "mega_cap": f"Mega-Cap Stocks (≥${C.MIN_MARKET_CAP/1e9:g}B)" if show_mega else "Mega-Cap Stocks",
+                "kept": "Kept on Watchlist",
+            }
+            selected = st.session_state.selected_stage
 
-                scanned_df = result.get("scanned_df")
-                if scanned_df is not None and not scanned_df.empty:
-                    st.subheader(f"Mega-cap stocks scanned ({len(scanned_df)})")
-                    display_df = scanned_df.rename(columns={
+            def _color_change(v):
+                if v > 0:
+                    return "color: #16A34A"
+                if v < 0:
+                    return "color: #DC2626"
+                return ""
+
+            if selected == "kept":
+                if n_kept == 0:
+                    st.markdown('<div class="empty-box">', unsafe_allow_html=True)
+                    st.markdown("### No stocks passed all filters today")
+                    st.markdown("Also a valid outcome — no forced trades on a quiet tape.")
+                    st.markdown('</div>', unsafe_allow_html=True)
+                else:
+                    df = result["results_df"]
+                    st.subheader(f"Kept on Watchlist ({n_kept})")
+                    st.dataframe(
+                        df.style.format({
+                            "score": "{:.2f}", "price": "${:.2f}",
+                            "atr_pct": "{:.2f}%", "volume_ratio": "{:.2f}x",
+                            "dist_high20": "{:.2f}%", "rsi": "{:.1f}",
+                            "ret20": "{:+.2f}%", "target": "${:.2f}", "stop": "${:.2f}",
+                        }).background_gradient(subset=["score"], cmap="Greens"),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+                    st.download_button(
+                        "⬇ Download watchlist CSV",
+                        data=df.to_csv(index=False),
+                        file_name=result["watchlist_path"] or f"watchlist_{result['date']}.csv",
+                        mime="text/csv",
+                    )
+                    st.caption(
+                        f"Trade plan per ticker: target +{C.TARGET_PCT:g}%, stop -{C.STOP_PCT:g}%, "
+                        "time-stop at end of day if neither hits."
+                    )
+            else:
+                stage_df = result["stage_dfs"].get(selected)
+                st.subheader(f"{stage_labels[selected]} ({0 if stage_df is None else len(stage_df)})")
+                if stage_df is None or stage_df.empty:
+                    st.caption("No stocks at this stage today.")
+                else:
+                    display_df = stage_df.rename(columns={
                         "ticker": "Ticker",
                         "price": "Current Price",
                         "prev_close": "Yesterday's Close",
@@ -267,14 +326,6 @@ if st.session_state.view == "screener":
                         "day_low": "Today's Low",
                         "day_high": "Today's High",
                     })
-
-                    def _color_change(v):
-                        if v > 0:
-                            return "color: #16A34A"
-                        if v < 0:
-                            return "color: #DC2626"
-                        return ""
-
                     st.dataframe(
                         display_df.style.format({
                             "Current Price": "${:.2f}", "Yesterday's Close": "${:.2f}",
@@ -284,28 +335,6 @@ if st.session_state.view == "screener":
                         use_container_width=True,
                         hide_index=True,
                     )
-            else:
-                df = result["results_df"]
-                st.dataframe(
-                    df.style.format({
-                        "score": "{:.2f}", "price": "${:.2f}",
-                        "atr_pct": "{:.2f}%", "volume_ratio": "{:.2f}x",
-                        "dist_high20": "{:.2f}%", "rsi": "{:.1f}",
-                        "ret20": "{:+.2f}%", "target": "${:.2f}", "stop": "${:.2f}",
-                    }).background_gradient(subset=["score"], cmap="Greens"),
-                    use_container_width=True,
-                    hide_index=True,
-                )
-                st.download_button(
-                    "⬇ Download watchlist CSV",
-                    data=df.to_csv(index=False),
-                    file_name=result["watchlist_path"] or f"watchlist_{result['date']}.csv",
-                    mime="text/csv",
-                )
-                st.caption(
-                    f"Trade plan per ticker: target +{C.TARGET_PCT:g}%, stop -{C.STOP_PCT:g}%, "
-                    "time-stop at end of day if neither hits."
-                )
     else:
         st.info("Click **Refresh Screener** above to fetch today's data and screen the universe.")
 

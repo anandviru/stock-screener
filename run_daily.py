@@ -46,17 +46,20 @@ def run_pipeline(progress=lambda msg: None) -> dict:
 
     if C.MIN_MARKET_CAP > 0:
         progress(f"Checking market caps (mega-cap only, >= ${C.MIN_MARKET_CAP/1e9:g}B)...")
-    results, reasons, funnel, scanned = run_screen(
+    results, reasons, funnel, stages = run_screen(
         histories, spy, vix,
         market_cap_fetcher=fetch_market_cap if C.MIN_MARKET_CAP > 0 else None,
     )
 
-    scanned_df = None
-    if scanned:
-        scanned_df = pd.DataFrame(scanned)[
+    def _stage_df(rows: list[dict]):
+        if not rows:
+            return None
+        return pd.DataFrame(rows)[
             ["ticker", "price", "prev_close", "change", "change_pct",
              "day_low", "day_high"]
         ].round(2)
+
+    stage_dfs = {key: _stage_df(rows) for key, rows in stages.items()}
 
     out = {
         "date": today,
@@ -65,7 +68,7 @@ def run_pipeline(progress=lambda msg: None) -> dict:
         "regime_ok": results is not None,
         "regime_reasons": reasons,
         "funnel": funnel,
-        "scanned_df": scanned_df,
+        "stage_dfs": stage_dfs,
         "skipped_earnings": [],
         "results_df": None,
         "watchlist_path": None,
@@ -129,9 +132,10 @@ def main() -> None:
 
     if result["results_df"] is None:
         print("No stocks passed all filters today. Also a valid outcome.")
-        if result["scanned_df"] is not None:
-            print(f"\nMega-cap stocks scanned ({len(result['scanned_df'])}):")
-            print(result["scanned_df"].to_string(index=False))
+        mega_cap_df = result["stage_dfs"].get("mega_cap")
+        if mega_cap_df is not None:
+            print(f"\nMega-cap stocks scanned ({len(mega_cap_df)}):")
+            print(mega_cap_df.to_string(index=False))
         return
 
     df = result["results_df"]
