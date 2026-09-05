@@ -10,13 +10,17 @@ colliding with a user module of that name.
 Passwords are never stored in plain text — only a salted PBKDF2-SHA256
 hash, using the stdlib (no extra dependency for the hashing itself).
 
-Connection info comes from st.secrets["postgres"] (see .streamlit/secrets.toml
-locally, or the app's "Secrets" settings on Streamlit Community Cloud). A
-short-lived connection is opened per call rather than held open, since
-Streamlit reruns the script on every interaction.
+Connection info comes from environment variables (PGHOST, PGPORT, PGDATABASE,
+PGUSER, PGPASSWORD) — the standard mechanism on any host (DigitalOcean App
+Platform, a Docker container, etc.), set once in that platform's dashboard.
+Locally, falls back to st.secrets["postgres"] (.streamlit/secrets.toml,
+gitignored) so nothing extra is needed for local dev. A short-lived
+connection is opened per call rather than held open, since Streamlit
+reruns the script on every interaction.
 """
 
 import hashlib
+import os
 import re
 import secrets
 
@@ -27,8 +31,20 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PBKDF2_ROUNDS = 200_000
 
 
+def _connection_params() -> dict:
+    if os.environ.get("PGHOST"):
+        return {
+            "host": os.environ["PGHOST"],
+            "port": os.environ.get("PGPORT", 5432),
+            "dbname": os.environ.get("PGDATABASE", "postgres"),
+            "user": os.environ["PGUSER"],
+            "password": os.environ["PGPASSWORD"],
+        }
+    return dict(st.secrets["postgres"])
+
+
 def _connect():
-    return psycopg2.connect(**st.secrets["postgres"], sslmode="require")
+    return psycopg2.connect(**_connection_params(), sslmode="require")
 
 
 def _hash_password(password: str, salt_hex: str) -> str:
