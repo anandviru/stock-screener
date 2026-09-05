@@ -22,6 +22,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 import pandas as pd
 import streamlit as st
 
+import auth
 import config as C
 from backtest import run_backtest, summarize
 from run_daily import run_pipeline
@@ -35,7 +36,7 @@ st.set_page_config(
 # ---------- style ----------
 st.markdown("""
 <style>
-    .block-container { padding-top: 2rem; max-width: 1100px; }
+    .block-container { padding-top: 1.5rem; max-width: 1100px; }
     div[data-testid="stMetric"] {
         background: rgba(127,127,127,0.08);
         border-radius: 10px;
@@ -54,6 +55,52 @@ st.markdown("""
         padding: 16px 20px;
         margin: 8px 0 16px 0;
     }
+    .logo-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 38px;
+    }
+    .logo-badge {
+        background: #16A34A;
+        color: white;
+        font-weight: 800;
+        font-size: 13px;
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .logo-title {
+        font-size: 21px;
+        font-weight: 700;
+        color: #111827;
+        white-space: nowrap;
+    }
+    /* Refresh Screener / Backtest read as green ghost buttons */
+    div[data-testid="stButton"] button[kind="secondary"] {
+        border-color: #16A34A;
+        color: #16A34A;
+    }
+    div[data-testid="stButton"] button[kind="secondary"]:hover {
+        border-color: #15803D;
+        color: #15803D;
+        background-color: rgba(22,163,74,0.06);
+    }
+    /* Sign In reads as a solid dark button, distinct from the theme green */
+    .st-key-signin_btn button {
+        background-color: #111827 !important;
+        color: white !important;
+        border-color: #111827 !important;
+    }
+    .st-key-signin_btn button:hover {
+        background-color: #1F2937 !important;
+        border-color: #1F2937 !important;
+        color: white !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -63,6 +110,8 @@ if "backtest_trades" not in st.session_state:
     st.session_state.backtest_trades = None
 if "view" not in st.session_state:
     st.session_state.view = "screener"
+if "user" not in st.session_state:
+    st.session_state.user = None
 
 
 def _run_screener_now():
@@ -75,16 +124,62 @@ def _run_screener_now():
     progress_area.empty()
 
 
+@st.dialog("Sign in")
+def _auth_dialog():
+    mode = st.radio("Mode", ["Sign In", "Sign Up"], horizontal=True, label_visibility="collapsed")
+    email = st.text_input("Email")
+    password = st.text_input("Password", type="password")
+    password2 = st.text_input("Confirm password", type="password") if mode == "Sign Up" else None
+
+    if st.button("Create account" if mode == "Sign Up" else "Sign in",
+                 type="primary", use_container_width=True):
+        if mode == "Sign Up":
+            if password != password2:
+                st.error("Passwords don't match.")
+            else:
+                ok, msg = auth.sign_up(email, password)
+                if ok:
+                    st.session_state.user = email.strip().lower()
+                    st.rerun()
+                else:
+                    st.error(msg)
+        else:
+            ok, msg = auth.log_in(email, password)
+            if ok:
+                st.session_state.user = email.strip().lower()
+                st.rerun()
+            else:
+                st.error(msg)
+
+    st.caption(
+        "Demo accounts only — stored locally and may reset when the app restarts."
+    )
+
+
 # ---------- header ----------
-col_title, col_run, col_nav = st.columns([5, 2, 1.3], vertical_alignment="center")
+col_title, col_run, col_nav, col_auth = st.columns(
+    [4.5, 1.7, 1.1, 1.1], vertical_alignment="center"
+)
 with col_title:
-    st.markdown("## 📈 Daily 1% Screener")
+    st.markdown(
+        '<div class="logo-row"><div class="logo-badge">1%</div>'
+        '<div class="logo-title">Daily 1% Screener</div></div>',
+        unsafe_allow_html=True,
+    )
 with col_run:
-    if st.button("🔄 Refresh Screener", type="primary", use_container_width=True):
+    if st.button("🔄 Refresh Screener", type="secondary", use_container_width=True):
         _run_screener_now()
 with col_nav:
     if st.button("🧪 Backtest", type="secondary", use_container_width=True):
         st.session_state.view = "backtest"
+with col_auth:
+    if st.session_state.user:
+        if st.button(f"👤 {st.session_state.user.split('@')[0]} (Sign out)", use_container_width=True):
+            st.session_state.user = None
+            st.rerun()
+    else:
+        if st.button("Sign In", use_container_width=True, key="signin_btn"):
+            _auth_dialog()
 
 st.caption(
     "Flags up to 10 liquid stocks whose structure makes a +1% move plausible "
